@@ -526,7 +526,7 @@ pub fn host_function(fun: &Function, gpu: &Gpu, out: &mut Write) {
     let mut extra_cleanup = vec![];
     let params = fun.device_code_args().map(|p| match *p {
         ParamVal::External(p, _) => format!("&{}", p.name),
-        ParamVal::Size(size) => {
+        ParamVal::Size(ref size) => {
             let extra_var = format!("_extra_{}", next_extra_var_id);
             next_extra_var_id += 1;
             extra_def.push(format!("int32_t {} = {};", extra_var, host_size(size)));
