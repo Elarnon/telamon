@@ -1,7 +1,7 @@
 //! Provides functions to print PTX code.
 use device::cuda::{Gpu, Namer};
 use codegen::*;
-use ir::{self, dim, op, Operand, Size, Type};
+use ir::{self, dim, op, Operand, Type};
 use itertools::Itertools;
 use search_space::{DimKind, Domain, InstFlag};
 use std::io::Write;
@@ -274,10 +274,10 @@ fn enable_threads(fun: &Function, threads: &[bool], namer: &mut NameMap) -> Stri
 
 /// Prints a multiplicative induction var level.
 fn parallel_induction_level(level: &InductionLevel, namer: &NameMap) -> String {
-    let dim_id = level.increment.map(|(dim, _)| dim);
+    let dim_id = level.increment.as_ref().map(|&(dim, _)| dim);
     let ind_var = namer.name_induction_var(level.ind_var, dim_id);
     let base_components =  level.base.components().map(|v| namer.name(v)).collect_vec();
-    if let Some((dim, increment)) = level.increment {
+    if let Some((dim, ref increment)) = level.increment {
         let index = namer.name_index(dim);
         let step = namer.name_size(increment, Type::I(32));
         let mode = if level.t() == Type::I(64) { "wide" } else { "lo" };
@@ -313,7 +313,7 @@ fn ptx_loop(fun: &Function, dim: &Dimension, cfgs: &[Cfg], namer: &mut NameMap)
             let ind_levels = dim.induction_levels().iter();
             let (var_init, var_step): (String, String) = ind_levels.map(|level| {
                 let t = ptx_type(level.t());
-                let dim_id = level.increment.map(|(dim, _)| dim);
+                let dim_id = level.increment.as_ref().map(|&(dim, _)| dim);
                 let ind_var = namer.name_induction_var(level.ind_var, dim_id);
                 let base_components = level.base.components().map(|v| namer.name(v));
                 let init = match base_components.collect_vec()[..] {
@@ -322,7 +322,7 @@ fn ptx_loop(fun: &Function, dim: &Dimension, cfgs: &[Cfg], namer: &mut NameMap)
                         format!("add.{} {}, {}, {};\n  ", t, ind_var, lhs, rhs),
                     _ => panic!(),
                 };
-                let step = if let Some((_, increment)) = level.increment {
+                let step = if let Some((_, ref increment)) = level.increment {
                     let step = namer.name_size(increment, level.t());
                     format!("add.{} {}, {}, {};\n  ", t, ind_var, step, ind_var)
                 } else { String::new() };
@@ -345,7 +345,7 @@ fn ptx_loop(fun: &Function, dim: &Dimension, cfgs: &[Cfg], namer: &mut NameMap)
             let mut incr_levels = Vec::new();
             for level in dim.induction_levels() {
                 let t = ptx_type(level.t());
-                let dim_id = level.increment.map(|(dim, _)| dim);
+                let dim_id = level.increment.as_ref().map(|&(dim, _)| dim);
                 let ind_var = namer.name_induction_var(level.ind_var, dim_id).to_string();
                 let base_components = level.base.components().map(|v| namer.name(v));
                 let base = match base_components.collect_vec()[..] {
@@ -358,14 +358,14 @@ fn ptx_loop(fun: &Function, dim: &Dimension, cfgs: &[Cfg], namer: &mut NameMap)
                     _ => panic!(),
                 };
                 body.push(format!("mov.{} {}, {};", t, ind_var, base));
-                if let Some((_, incr)) = level.increment {
+                if let Some((_, ref incr)) = level.increment {
                     incr_levels.push((level, ind_var, t, incr, base));
                 }
             }
             for i in 0..unwrap!(dim.size().as_int()) {
                 namer.set_current_index(dim, i);
                 if i > 0 {
-                    for &(level, ref ind_var, ref t, incr, ref base) in &incr_levels {
+                    for &(level, ref ind_var, ref t, ref incr, ref base) in &incr_levels {
                         let incr =  if let Some(step) = incr.as_int() {
                             format!("add.{} {}, {}, {};", t, ind_var, step*i, base)
                         } else {
@@ -467,7 +467,7 @@ pub fn function(function: &Function, gpu: &Gpu) -> String {
         for dim in function.dimensions() {
             if !dim.kind().intersects(DimKind::UNROLL | DimKind::LOOP) { continue; }
             for level in dim.induction_levels() {
-                if let Some((_, incr)) = level.increment {
+                if let Some((_, ref incr)) = level.increment {
                     let name = name_map.declare_size_cast(incr, level.t());
                     if let Some(name) = name {
                         let ptx_t = ptx_type(level.t());

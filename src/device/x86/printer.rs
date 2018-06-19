@@ -147,10 +147,10 @@ fn cfg_vec(fun: &Function, cfgs: &[Cfg], namer: &mut NameMap) -> String {
 
 /// Prints a multiplicative induction var level.
 fn parallel_induction_level(level: &InductionLevel, namer: &NameMap) -> String {
-    let dim_id = level.increment.map(|(dim, _)| dim);
+    let dim_id = level.increment.as_ref().map(|&(dim, _)| dim);
     let ind_var = namer.name_induction_var(level.ind_var, dim_id);
     let base_components =  level.base.components().map(|v| namer.name(v)).collect_vec();
-    if let Some((dim, increment)) = level.increment {
+    if let Some((dim, ref increment)) = level.increment {
         let index = namer.name_index(dim);
         let step = namer.name_size(increment, Type::I(32));
         match base_components[..] {
@@ -208,7 +208,7 @@ fn standard_loop(fun: &Function, dim: &Dimension, cfgs: &[Cfg], namer: &mut Name
     let idx = namer.name_index(dim.id()).to_string();
     let ind_levels = dim.induction_levels().iter();
     let (var_init, var_step): (String, String) = ind_levels.map(|level| {
-        let dim_id = level.increment.map(|(dim, _)| dim);
+        let dim_id = level.increment.as_ref().map(|&(dim, _)| dim);
         let ind_var = namer.name_induction_var(level.ind_var, dim_id);
         let base_components = level.base.components().map(|v| namer.name(v));
         let init = match base_components.collect_vec()[..] {
@@ -217,7 +217,7 @@ fn standard_loop(fun: &Function, dim: &Dimension, cfgs: &[Cfg], namer: &mut Name
                 format!(" {} = {} + {};\n  ", ind_var, lhs, rhs),
             _ => panic!(),
         };
-        let step = if let Some((_, increment)) = level.increment {
+        let step = if let Some((_, ref increment)) = level.increment {
             let step = namer.name_size(increment, level.t());
             format!("{} += {};\n  ", ind_var, step)
         } else { String::new() };
@@ -239,7 +239,7 @@ fn unroll_loop(fun: &Function, dim: &Dimension, cfgs: &[Cfg], namer: &mut NameMa
     let mut incr_levels = Vec::new();
     for level in dim.induction_levels() {
         let t = cpu_type(&level.t());
-        let dim_id = level.increment.map(|(dim, _)| dim);
+        let dim_id = level.increment.as_ref().map(|&(dim, _)| dim);
         let ind_var = namer.name_induction_var(level.ind_var, dim_id).to_string();
         let base_components = level.base.components().map(|v| namer.name(v));
         let base = match base_components.collect_vec()[..] {
@@ -252,14 +252,14 @@ fn unroll_loop(fun: &Function, dim: &Dimension, cfgs: &[Cfg], namer: &mut NameMa
             _ => panic!(),
         };
         body.push(format!("{} = {};", ind_var, base));
-        if let Some((_, incr)) = level.increment {
-            incr_levels.push((level, ind_var, t, incr, base));
+        if let Some((_, ref incr)) = level.increment {
+            incr_levels.push((level, ind_var, t, incr.clone(), base));
         }
     }
     for i in 0..unwrap!(dim.size().as_int()) {
         namer.set_current_index(dim, i);
         if i > 0 {
-            for &(level, ref ind_var, _, incr, ref base) in &incr_levels {
+            for &(level, ref ind_var, _, ref incr, ref base) in &incr_levels {
                 let incr =  if let Some(step) = incr.as_int() {
                     format!(" {} = {} + {};", ind_var, step*i, base)
                 } else {
@@ -337,7 +337,7 @@ pub fn function(function: &Function) -> String {
         for dim in function.dimensions() {
             if !dim.kind().intersects(DimKind::UNROLL | DimKind::LOOP) { continue; }
             for level in dim.induction_levels() {
-                if let Some((_, incr)) = level.increment {
+                if let Some((_, ref incr)) = level.increment {
                     let name = name_map.declare_size_cast(incr, level.t());
                     if let Some(name) = name {
                         let cpu_t = cpu_type(&level.t());
