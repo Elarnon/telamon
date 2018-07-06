@@ -3,8 +3,8 @@ pipeline {
 
     stages {
         stage('Build') {
-            withCredentials([sshUserPrivateKey(credentialsId: "ficus", keyFileVariable: 'keyfile')]) {
-                steps {
+            steps {
+                withCredentials([sshUserPrivateKey(credentialsId: "ficus", keyFileVariable: 'keyfile')]) {
                     sh 'scp -i ${keyfile} Cargo.toml localhost:/home/elarnon/experiments/'
                 }
             }
