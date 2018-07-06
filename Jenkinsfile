@@ -2,8 +2,8 @@ pipeline {
     agent { label 'ficus' }
 
     stages {
-        withCredentials([sshUserPrivateKey(credentialsId: "ficus", keyFileVariable: 'keyfile')]) {
-            stage('Build') {
+        stage('Build') {
+            withCredentials([sshUserPrivateKey(credentialsId: "ficus", keyFileVariable: 'keyfile')]) {
                 steps {
                     sh 'scp -i ${keyfile} Cargo.toml localhost:/home/elarnon/experiments/'
                 }
