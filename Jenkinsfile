@@ -6,7 +6,7 @@ pipeline {
             steps {
                 sh 'mkdir -p output && cp Settings.toml output'
                 dir('output') {
-                    sh 'RUST_LOG=telamon::explorer=warn cargo run --manifest-path ../kernels/Cargo.toml --release --bin search -- --device cuda'
+                    sh 'RUST_LOG=telamon::explorer=warn cargo run --features cuda --manifest-path ../kernels/Cargo.toml --release --bin search -- --device cuda'
                 }
             }
 
