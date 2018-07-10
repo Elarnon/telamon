@@ -12,9 +12,7 @@ use telamon_kernels::{linalg, Kernel};
 mod cuda_wrapper {
     use telamon::device::cuda;
 
-    type CudaContext = cuda::Context;
-
-    pub fn with_cuda_context<F: FnOnce(&mut CudaContext)>(f: F) {
+    pub fn with_cuda_context<'a, F: FnOnce(&mut cuda::Context<'a>)>(f: F) {
         f(&mut cuda::Context::new(&cuda::Executor::init()));
     }
 }
@@ -23,9 +21,7 @@ mod cuda_wrapper {
 mod cuda_wrapper {
     use telamon::device::x86;
 
-    type CudaContext = x86::Context;
-
-    pub fn with_cuda_context<F: FnOnce(&mut CudaContext)>(_f: F) {
+    pub fn with_cuda_context<F: FnOnce(&mut x86::Context)>(_f: F) {
         panic!("cuda support is not available. Try --device x86.");
     }
 }
