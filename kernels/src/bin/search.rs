@@ -12,8 +12,9 @@ use telamon_kernels::{linalg, Kernel};
 mod cuda_wrapper {
     use telamon::device::cuda;
 
-    pub fn with_cuda_context<'a, F: FnOnce(&mut cuda::Context<'a>)>(f: F) {
-        f(&mut cuda::Context::new(&cuda::Executor::init()));
+    pub fn with_cuda_context<F: for<'a> FnOnce(cuda::Context<'a>)>(f: F) {
+        let executor = cuda::Executor::init();
+        f(cuda::Context::new(&executor));
     }
 }
 
@@ -21,18 +22,18 @@ mod cuda_wrapper {
 mod cuda_wrapper {
     use telamon::device::x86;
 
-    pub fn with_cuda_context<F: FnOnce(&mut x86::Context)>(_f: F) {
+    pub fn with_cuda_context<F: FnOnce(x86::Context)>(_f: F) {
         panic!("cuda support is not available. Try --device x86.");
     }
 }
 
-fn with_x86_context<F: FnOnce(&mut x86::Context)>(f: F) {
-    f(&mut x86::Context::new())
+fn with_x86_context<F: FnOnce(x86::Context)>(f: F) {
+    f(x86::Context::new())
 }
 
-fn run<C: device::ArgMap + device::Context>(config: &Config, context: &mut C) {
+fn run<C: device::ArgMap + device::Context>(config: &Config, mut context: C) {
     let params = linalg::MatMulP::new(1024, 1024, 1024);
-    linalg::MatMul::<f32>::benchmark(&config, params, 0, context);
+    linalg::MatMul::<f32>::benchmark(&config, params, 0, &mut context);
 }
 
 enum Device {
