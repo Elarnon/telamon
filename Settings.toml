@@ -1,3 +1,3 @@
+max_evaluations = 10
 [algorithm]
 type = "bandit"
-max_evaluations = 10
