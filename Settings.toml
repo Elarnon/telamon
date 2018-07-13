@@ -1,4 +1,4 @@
-max_evaluations = 10000
+max_evaluations = 40000
 [algorithm]
 type = "bandit"
 threshold = 100
