@@ -2,13 +2,13 @@ pipeline {
     agent any
 
     parameters {
-        file name: 'settings', description: 'Telamon configuration file'
+        file(name: 'settings', description: 'Telamon configuration file')
     }
 
     stages {
         stage('Build') {
             steps {
-                sh 'cat ${params.settings}'
+                sh 'echo ${params.settings}'
 
                 dir('telamon-py') {
                     withEnv(['TELAMON_CUDA_ENABLE=1']) {
