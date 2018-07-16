@@ -8,7 +8,7 @@ pipeline {
     stages {
         stage('Build') {
             steps {
-                sh 'echo ${params.settings}'
+                sh "echo ${params.settings}"
 
                 dir('telamon-py') {
                     withEnv(['TELAMON_CUDA_ENABLE=1']) {
