@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     parameters {
-        file(name: 'settings', description: 'Telamon configuration file')
+        text(name: 'settings', description: 'Telamon configuration file')
     }
 
     stages {
