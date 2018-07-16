@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     parameters {
-        text(name: 'settings', description: 'Telamon configuration file')
+        text(name: 'settings', description: 'Telamon configuration file', default: "max_evaluations = 100_000")
         string(name: 'kernel', description: 'Kernel to use', defaultValue: 'matmul')
         choice(choices: 'gpu\ncpu', name: 'device', description: 'Device to run the kernel on')
     }
