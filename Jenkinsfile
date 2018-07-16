@@ -4,7 +4,7 @@ pipeline {
     parameters {
         text(name: 'settings', description: 'Telamon configuration file')
         string(name: 'kernel', description: 'Kernel to use', defaultValue: 'matmul')
-        choice(choices: 'cpu\ngpu', name: 'device', description: 'Device to run the kernel on', defaultValue: 'gpu')
+        choice(choices: 'gpu\ncpu', name: 'device', description: 'Device to run the kernel on')
     }
 
     stages {
