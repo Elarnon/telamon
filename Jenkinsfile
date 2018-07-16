@@ -1,9 +1,15 @@
 pipeline {
     agent any
 
+    parameters {
+        file name: 'Settings.toml', description: 'Telamon configuration file'
+    }
+
     stages {
         stage('Build') {
             steps {
+                sh 'cat Settings.toml'
+
                 dir('telamon-py') {
                     withEnv(['TELAMON_CUDA_ENABLE=1']) {
                         withPythonEnv('System-CPython-3.4') {
