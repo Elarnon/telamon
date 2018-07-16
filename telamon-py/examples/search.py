@@ -20,7 +20,6 @@ if __name__ == '__main__':
     if ns.config is not None:
         with open(ns.config) as f:
             config = toml.load(f)
-    config = {'max_evaluations': 4}
 
     kernel = KERNELS[ns.kernel]
 
