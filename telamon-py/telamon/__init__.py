@@ -103,8 +103,7 @@ class _Tiling:
     """
     
     def __init__(self, tiles):
-
-    """Initializes a new _Tiling wrapper.
+        """Initializes a new _Tiling wrapper.
 
         Args:
             tiles: The tiles ton convert. Must be either `None` (allow all tilings
@@ -155,6 +154,6 @@ class MatMul(Kernel):
             lib.kernel_matmul_new(
                 m, n, k,
                 a_stride, transpose_a, transpose_b, generic,
-                self._m_tiles.data, self._m_tiles.length,
-                self._n_tiles.data, self._n_tiles.length,
-                self._k_tiles.data, self._k_tiles.length))
+                m_tiles.data, m_tiles.length,
+                n_tiles.data, n_tiles.length,
+                k_tiles.data, k_tiles.length))
