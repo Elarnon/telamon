@@ -94,24 +94,33 @@ class Kernel(RustObject):
             raise TelamonError(
                 'Optimization failed.')
 
-def _ffi_tiling(tiles):
+class _Tiling:
     """Helper to convert Python tilings into a cffi compatible object.
 
-    Args:
-        tiles: The tiles ton convert. Must be either `None` (allow all tilings
-            across this axis) or a single tile definition.
-
-    Returns:
-        A newly allocated <cdata> object containing a copy of the tile
-        specification.
+    _Tiling instances wrap a pointer to a cffi-allocated copy of the
+    tiling data as well as the tiles length. It must outlive the usage
+    of the underlying data pointer.
     """
     
-    if tiles is None:
-        return ffi.NULL
+    def __init__(self, tiles):
 
-    cdata = ffi.new('unsigned int *', len(tiles))
-    cdata[0:len(tiles)] = tiles
-    return cdata
+    """Initializes a new _Tiling wrapper.
+
+        Args:
+            tiles: The tiles ton convert. Must be either `None` (allow all tilings
+                across this axis) or a single tile definition.
+        """
+    
+        if tiles is None:
+            self.data = ffi.NULL
+            self.length = 0
+
+        else:
+            cdata = ffi.new('unsigned int *', len(tiles))
+            cdata[0:len(tiles)] = tiles
+            self.data = cdata
+            self.length = len(tiles)
+
 
 class MatMul(Kernel):
     """A Matrix Multiply kernel."""
@@ -135,10 +144,17 @@ class MatMul(Kernel):
             raise ValueError(
                 'a_stride should be a positive integer.')
 
+        # We need to store the _Tiling objects into variables in order
+        # for the data pointers to stay alive until after the call
+        # below.
+        m_tiles = _Tiling(m_tiles)
+        n_tiles = _Tiling(n_tiles)
+        k_tiles = _Tiling(k_tiles)
+
         super().__init__(
             lib.kernel_matmul_new(
                 m, n, k,
-                a_stride, int(transpose_a), int(transpose_b), int(generic),
-                _ffi_tiling(tiling_m), len(tiling_m),
-                _ffi_tiling(tiling_n), len(tiling_n),
-                _ffi_tiling(tiling_k), len(tiling_k)))
+                a_stride, transpose_a, transpose_b, generic,
+                self._m_tiles.data, self._m_tiles.length,
+                self._n_tiles.data, self._n_tiles.length,
+                self._k_tiles.data, self._k_tiles.length))
