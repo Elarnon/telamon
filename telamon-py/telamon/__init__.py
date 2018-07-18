@@ -94,35 +94,24 @@ class Kernel(RustObject):
             raise TelamonError(
                 'Optimization failed.')
 
-class _Tiling:
-    """Helper to convert Python tilings into a cffi compatible object."""
+def _ffi_tiling(tiles):
+    """Helper to convert Python tilings into a cffi compatible object.
 
-    def __init__(self, tiles):
-        """Initializes a new _Tiling wrapper.
+    Args:
+        tiles: The tiles ton convert. Must be either `None` (allow all tilings
+            across this axis) or a single tile definition.
 
+    Returns:
+        A newly allocated <cdata> object containing a copy of the tile
+        specification.
+    """
+    
+    if tiles is None:
+        return ffi.NULL
 
-        Args:
-            tiles: The tiles ton convert. Must be either `None` (allow all tilings
-                across this axis) or a single tile definition.
-        """
-
-        if tiles is None:
-            self._data = ffi.NULL
-            self._tiling = ffi.NULL
-
-        else:
-            # We need to keep a Python object around with a reference
-            # to the data, simply storing it into another C struct
-            # (e.g. the Tiling object) will not keep it alive and it
-            # will get freed immediately.
-            self._data = ffi.new('unsigned int *', len(tiles))
-            self._data[0:len(tiles)] = tiles
-            self._tiling = ffi.new('Tiling *')
-            self._tiling.length = len(tiles)
-            self._tiling.data = self._data
-
-    def as_ptr(self):
-        return self._tiling
+    cdata = ffi.new('unsigned int *', len(tiles))
+    cdata[0:len(tiles)] = tiles
+    return cdata
 
 class MatMul(Kernel):
     """A Matrix Multiply kernel."""
@@ -150,6 +139,6 @@ class MatMul(Kernel):
             lib.kernel_matmul_new(
                 m, n, k,
                 a_stride, int(transpose_a), int(transpose_b), int(generic),
-                _Tiling(m_tiles).as_ptr(),
-                _Tiling(n_tiles).as_ptr(),
-                _Tiling(k_tiles).as_ptr()))
+                _ffi_tiling(tiling_m), len(tiling_m),
+                _ffi_tiling(tiling_n), len(tiling_n),
+                _ffi_tiling(tiling_k), len(tiling_k)))
