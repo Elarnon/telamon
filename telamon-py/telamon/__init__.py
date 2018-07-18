@@ -94,24 +94,35 @@ class Kernel(RustObject):
             raise TelamonError(
                 'Optimization failed.')
 
-def _ffi_tiling(tiles):
-    """Helper to convert Python tilings into a cffi compatible object.
+class _Tiling:
+    """Helper to convert Python tilings into a cffi compatible object."""
 
-    Args:
-        tiles: The tiles ton convert. Must be either `None` (allow all tilings
-            across this axis) or a single tile definition.
+    def __init__(self, tiles):
+        """Initializes a new _Tiling wrapper.
 
-    Returns:
-        A cffi object representing a newly allocated tiling object.
-    """
-    if tiles is None:
-        return ffi.NULL
 
-    c_tiles = ffi.new('Tiling *')
-    c_tiles.length = len(tiles)
-    c_tiles.data = ffi.new('unsigned int *', len(tiles))
-    c_tiles.data[0:len(tiles)] = tiles
-    return c_tiles
+        Args:
+            tiles: The tiles ton convert. Must be either `None` (allow all tilings
+                across this axis) or a single tile definition.
+        """
+
+        if tiles is None:
+            self._data = ffi.NULL
+            self._tiling = ffi.NULL
+
+        else:
+            # We need to keep a Python object around with a reference
+            # to the data, simply storing it into another C struct
+            # (e.g. the Tiling object) will not keep it alive and it
+            # will get freed immediately.
+            self._data = ffi.new('unsigned int *', len(tiles))
+            self._data[0:len(tiles)] = tiles
+            self._tiling = ffi.new('Tiling *')
+            self._tiling.length = len(tiles)
+            self._tiling.data = self._data
+
+    def as_ptr(self):
+        return self._tiling
 
 class MatMul(Kernel):
     """A Matrix Multiply kernel."""
@@ -135,17 +146,10 @@ class MatMul(Kernel):
             raise ValueError(
                 'a_stride should be a positive integer.')
 
-        # We need to keep around a reference to the cffi objects until after
-        # the call is done in order to avoid having memory released too early.
-        # Using temporaries by passing in the result of `_ffi_tiling` directly
-        # to the `lib.kernel_matmul_new` call is not enough and can cause
-        # use-after-free bugs.
-        ffi_m_tiles = _ffi_tiling(m_tiles)
-        ffi_n_tiles = _ffi_tiling(n_tiles)
-        ffi_k_tiles = _ffi_tiling(k_tiles)
-
         super().__init__(
             lib.kernel_matmul_new(
                 m, n, k,
                 a_stride, int(transpose_a), int(transpose_b), int(generic),
-                ffi_m_tiles, ffi_n_tiles, ffi_k_tiles))
+                _Tiling(m_tiles).as_ptr(),
+                _Tiling(n_tiles).as_ptr(),
+                _Tiling(k_tiles).as_ptr()))
