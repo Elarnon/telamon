@@ -101,7 +101,7 @@ class _Tiling:
     tiling data as well as the tiles length. It must outlive the usage
     of the underlying data pointer.
     """
-    
+
     def __init__(self, tiles):
         """Initializes a new _Tiling wrapper.
 
@@ -109,7 +109,7 @@ class _Tiling:
             tiles: The tiles ton convert. Must be either `None` (allow all tilings
                 across this axis) or a single tile definition.
         """
-    
+
         if tiles is None:
             self.data = ffi.NULL
             self.length = 0
