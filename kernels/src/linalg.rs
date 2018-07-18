@@ -260,7 +260,7 @@ pub struct MatMul<'a, S: Scalar> {
     c: Tensor<'a, S>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MatMulP {
     pub m: i32,
     pub n: i32,

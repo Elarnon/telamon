@@ -46,6 +46,7 @@ impl KernelParameters {
     ) {
         match self {
             KernelParameters::MatMul(params) => {
+                println!("Benchmarking {:?}", params);
                 linalg::MatMul::<f32>::benchmark(
                     config, params.clone(), 0, context);
             }
