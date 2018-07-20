@@ -12,6 +12,7 @@ pub mod local_selection;
 
 pub use self::config::{Config, SearchAlgorithm};
 pub use self::candidate::Candidate;
+pub use self::logger::LogMessage;
 
 use self::choice::fix_order;
 use self::monitor::{monitor, MonitorMessage};
@@ -23,6 +24,7 @@ use crossbeam;
 use device::{Context, EvalMode};
 use model::bound;
 use search_space::SearchSpace;
+use serde::Serialize;
 use std::sync;
 use futures::prelude::*;
 use futures::{channel, SinkExt};
@@ -56,24 +58,33 @@ pub fn find_best_ex<'a>(config: &Config,
                         candidates: Vec<Candidate<'a>>) -> Option<Candidate<'a>> { 
     match config.algorithm {
         config::SearchAlgorithm::MultiArmedBandit(ref band_config) => {
-            let tree = bandit_arm::Tree::new(candidates, band_config);
-            launch_search(config, tree, context)
-        }
+            let (log_sender, log_receiver) = sync::mpsc::sync_channel(100);
+            let tree = bandit_arm::Tree::new(candidates, band_config, log_sender.clone());
+            launch_search(config, tree, context, log_sender, log_receiver)
+        },
         config::SearchAlgorithm::BoundOrder => {
+            let (log_sender, log_receiver) = sync::mpsc::sync_channel(100);
             let candidate_list = ParallelCandidateList::new(config.num_workers);
             for candidate in candidates { candidate_list.insert(candidate); }
-            launch_search(config, candidate_list, context)
-        }
+            launch_search::<_, ()>(config, candidate_list, context, log_sender, log_receiver)
+        },
     }
 }
 
 /// Launch all threads needed for the search. wait for each one of them to finish. Monitor is
 /// supposed to return the best candidate found
-fn launch_search<'a, T>(config: &Config, candidate_store: T, context: &Context) 
-    -> Option<Candidate<'a>> where T: Store<'a>
+fn launch_search<'a, T, E>(
+    config: &Config,
+    candidate_store: T,
+    context: &Context,
+    log_sender: sync::mpsc::SyncSender<LogMessage<E>>,
+    log_receiver: sync::mpsc::Receiver<LogMessage<E>>,
+) -> Option<Candidate<'a>>
+where
+    T: Store<'a>,
+    E: Send + Serialize,
 {
     let (monitor_sender, monitor_receiver) = channel::mpsc::channel(100);
-    let (log_sender, log_receiver) = sync::mpsc::sync_channel(100);
     let maybe_candidate = crossbeam::scope( |scope| {
         unwrap!(scope.builder().name("Telamon - Logger".to_string())
             .spawn( || logger::log(config, log_receiver)));
