@@ -21,6 +21,8 @@ pipeline {
 
             post {
                 success {
+                    archiveArtifacts(artifacts: 'Cargo.lock')
+
                     dir('telamon-py/dist') {
                         archiveArtifacts(artifacts: '*.whl', fingerprint: true)
                     }
