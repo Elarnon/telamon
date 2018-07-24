@@ -12,10 +12,18 @@ use indexmap::IndexMap;
 #[derive(Clone, Debug)]
 pub enum Variable<'a> { Ref(&'a str), Rc(RcStr) }
 
+lazy_static! { static ref NEXT_VAR_ID: AtomicUsize = AtomicUsize::new(0); }
+
 impl<'a> Variable<'a> {
+    /// Reset the prefix counter. This is meant for use in tests only.
+    #[cfg(test)]
+    #[doc(hidden)]
+    pub(crate) fn reset_prefix() {
+        NEXT_VAR_ID.store(0, Ordering::SeqCst);
+    }
+
     /// Creates a new variable with the given prefix.
     pub fn with_prefix(prefix: &str) -> Self {
-        lazy_static! { static ref NEXT_VAR_ID: AtomicUsize = AtomicUsize::new(0); }
         let id = NEXT_VAR_ID.fetch_add(1, Ordering::SeqCst);
         Variable::Rc(RcStr::new(format!("{}_{}", prefix, id)))
     }

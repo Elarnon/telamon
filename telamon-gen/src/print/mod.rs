@@ -4,7 +4,7 @@ use ir;
 use itertools::Itertools;
 use serde_json::value::Value as JsonValue;
 use std::cmp::Ordering;
-use std::collections::{HashMap, BinaryHeap};
+use std::collections::BinaryHeap;
 use std::fmt::{self, Display, Formatter};
 use std::hash::Hash;
 use std::iter::FromIterator;
@@ -205,6 +205,8 @@ mod store;
 mod value_set;
 
 use self::store::PartialIterator;
+#[cfg(test)]
+pub(crate) use self::ast::Variable;
 
 /// Generate the trigger code to add a representant to a quotient set.
 pub fn add_to_quotient(set: &ir::SetDef,
@@ -250,6 +252,8 @@ pub fn print(ir_desc: &ir::IrDesc) -> String {
 /// relative position of elements which are not (transitively) ordered
 /// is preserved.
 ///
+/// # Return value
+///
 /// This function will either return `Ok` with a stable topological
 /// order or, if there are cycles in the ordering defined by
 /// `predecessors`, `Err` with a pair `(sorted, cycles)` where
@@ -257,11 +261,24 @@ pub fn print(ir_desc: &ir::IrDesc) -> String {
 /// `sorted` contains a stable topological order of the remaining
 /// nodes.
 ///
+/// # Arguments
+///
+/// * `nodes` - A slice that holds the nodes to sort. Must not contain
+///   duplicates.
+/// * `predecessors` - A function returning an iterable of
+///   predecessors or dependencies for each node. Will be called
+///   exactly once for each node in `nodes`. Each element of the
+///   returned iterator must be in `nodes.
+///
 /// # Panics
 ///
-/// This function will panic if `predecessors` return a value which is
-/// not in `nodes.
-fn stable_topological_sort<N, P, I>(
+/// This function will panic if there are duplicates in `nodes` or if
+/// `predecessors` return a value which is not in `nodes`.
+///
+/// # Examples
+///
+/// See the `stable_topological_sort_tests` module.
+fn stable_topological_sort<'a, N, P, I>(
     nodes: &[N],
     predecessors: P,
 ) -> Result<Vec<N>, (Vec<N>, Vec<N>)>
@@ -322,7 +339,9 @@ where
     let mut node_data: Vec<_> = (0..nodes.len()).map(NodeData::new).map(Some).collect();
     let index_map: HashMap<_, _> =
         HashMap::from_iter(nodes.iter().enumerate().map(|(index, node)| (node, index)));
-
+    if index_map.len() != nodes.len() {
+        panic!("duplicate nodes found");
+    }
 
     // Properly set the predecessors and successors for each node.
     for (index, node) in nodes.iter().enumerate() {
@@ -396,6 +415,89 @@ where
         Err((sorted, cycles))
     } else {
         Ok(sorted)
+    }
+}
+
+/// Note that the code in the `stable_topological_sort_tests` omdule
+/// should be in an Examples sections in the `stable_topological_sort`
+/// function, but we can't run rustdoc tests on private functions for
+/// some reason.
+///
+/// For the sake of concision and readability, the examples use
+/// letters to represent nodes and `:` to separate a node from its
+/// dependencies. For instance, `"d"` is a node called `"d"` without
+/// dependencies, `"e:d"` is a node called `"e"` with a single
+/// dependency on the node `"d"`, and `"f:e,q"` is a node called `"f"`
+/// with two dependencies on nodes `"e"` and `"q"`.
+#[cfg(test)]
+mod stable_topological_sort_tests {
+    use super::stable_topological_sort;
+
+    /// Sorting an array with no dependencies does not modify the
+    /// order.
+    #[test]
+    fn stable_no_deps() {
+        assert_eq!(
+            stable_topological_sort(&vec!["a", "b", "c", "d", "e"], |_| vec![]),
+            Ok(vec!["a", "b", "c", "d", "e"]))
+    }
+
+    /// Sorting an array which is already in topological order, even in
+    /// the presence of dependencies, does not modify the order either.
+    #[test]
+    fn stable_deps() {
+        assert_eq!(
+            stable_topological_sort(&vec!["a", "b", "c:b", "d"], |&node| {
+                match node {
+                    "c:b" => vec!["b"],
+                    _ => vec![],
+                }
+            }),
+            Ok(vec!["a", "b", "c:b", "d"]))
+    }
+
+    /// Elements which have a dependency are sorted immediately after
+    /// their last dependency.
+    #[test]
+    fn right_after_dep() {
+        assert_eq!(
+            stable_topological_sort(&vec!["a", "b:d", "c", "d", "e"], |&node| {
+                match node {
+                    "b:d" => vec!["d"],
+                    _ => vec![],
+                }
+            }),
+            Ok(vec!["a", "c", "d", "b:d", "e"]))
+    }
+
+    /// If multiple independent elements share a dependency, their
+    /// initial order is maintained.
+    #[test]
+    fn indep_after_dep() {
+        assert_eq!(
+            stable_topological_sort(&vec!["a", "b:d", "c:d", "d", "e"], |&node| {
+                match node {
+                    "b:d" => vec!["d"],
+                    "c:d" => vec!["d"],
+                    _ => vec![],
+                }
+            }),
+            Ok(vec!["a", "d", "b:d", "c:d", "e"]))
+    }
+
+    /// If multiple elements share a dependency, their own dependencies
+    /// are still satisfied.
+    #[test]
+    fn dep_after_dep() {
+        assert_eq!(
+            stable_topological_sort(&vec!["a", "b:d,c", "c:d", "d", "e"], |&node| {
+                match node {
+                    "b:d,c" => vec!["d", "c:d"],
+                    "c:d" => vec!["d"],
+                    _ => vec![],
+                }
+            }),
+            Ok(vec!["a", "d", "c:d", "b:d,c", "e"]))
     }
 }
 
