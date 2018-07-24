@@ -3,7 +3,6 @@ extern crate handlebars;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
 extern crate itertools;
-extern crate pathfinding;
 extern crate regex;
 extern crate rustfmt;
 extern crate serde;
@@ -12,6 +11,7 @@ extern crate serde_json;
 #[macro_use]
 extern crate telamon_utils as utils;
 extern crate libc;
+extern crate indexmap;
 
 extern crate lalrpop_util;
 

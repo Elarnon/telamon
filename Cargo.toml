@@ -6,6 +6,10 @@ readme = "README.md"
 version = "0.2.0"
 
 [[bin]]
+name = "load"
+path = "src/bin/load.rs"
+
+[[bin]]
 name = "cuda-characterize"
 path = "src/bin/cuda_characterize.rs"
 required-features = ["cuda"]
@@ -62,7 +66,7 @@ rpds = "0.5.0"
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0.22"
-serde_cbor = "0.8"
+bincode = "1.0"
 std-semaphore = "0.1.0"
 tempfile = "3.0.1"
 toml = "0.4"

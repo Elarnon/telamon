@@ -11,7 +11,7 @@ use rpds::List;
 use std;
 use std::f64;
 use std::sync::{Weak, Arc, RwLock};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use utils::*;
 
 struct TreeStats {
@@ -37,6 +37,7 @@ pub enum TreeEvent {
 /// A search tree to perform a multi-armed bandit search.
 pub struct Tree<'a, 'b> {
     shared_tree: Arc<RwLock<SubTree<'a>>>,
+    stop: AtomicBool,
     cut: RwLock<f64>,
     config: &'b BanditConfig,
     stats: TreeStats,
@@ -53,6 +54,7 @@ impl<'a, 'b> Tree<'a, 'b> {
         let root = SubTree::from_candidates(candidates, std::f64::INFINITY);
         Tree {
             shared_tree: Arc::new(RwLock::new(root)),
+            stop: AtomicBool::new(false),
             cut: RwLock::new(std::f64::INFINITY),
             config,
             stats: TreeStats::new(),
@@ -65,7 +67,7 @@ impl<'a, 'b> Tree<'a, 'b> {
     fn clean_deadends(&self, mut path: Path<'a>, cut: f64) {
         // A `None` bound indicates the path points to a dead-end.
         let mut bound = None;
-        while let Some((node, pos)) = path.path.pop() {
+        while let Some((node, pos)) = path.0.pop() {
             if let Some(node) = node.upgrade() {
                 let mut lock = unwrap!(node.write());
                 if let Some(bound) = bound {
@@ -109,7 +111,7 @@ impl<'a, 'b> Tree<'a, 'b> {
                         // We manually process the first two levels of the search as they
                         // are still in the tree and thus must be updated if needed.
                         if let Some((idx, maybe_candidate)) = res {
-                            path.path.push((Arc::downgrade(&node), idx));
+                            path.0.push((Arc::downgrade(&node), idx));
                             match maybe_candidate {
                                 Ok(candidate) => {
                                     let res = local_selection::descend(
@@ -125,7 +127,7 @@ impl<'a, 'b> Tree<'a, 'b> {
                         let next = unwrap!(node.write())
                             .descend(&self.config, context, cut);
                         if let Some((idx, new_state)) = next {
-                            path.path.push((Arc::downgrade(&node), idx));
+                            path.0.push((Arc::downgrade(&node), idx));
                             state = new_state;
                         }
                     }
@@ -151,13 +153,18 @@ impl<'a, 'b> Store<'a> for Tree<'a, 'b> {
         info!("trimming finished");
     }
 
-    fn commit_evaluation(&self, mut path: Self::PayLoad, eval: f64) {
+    fn commit_evaluation(
+        &self,
+        actions: List<choice::ActionEx>,
+        mut path: Self::PayLoad,
+        eval: f64,
+    ) {
         unwrap!(self.log.send(LogMessage::Event(TreeEvent::Evaluation {
-            actions: Sequence::List(path.actions),
+            actions: Sequence::List(actions),
             score: eval,
         })));
 
-        while let Some((node, idx)) = path.path.pop() {
+        while let Some((node, idx)) = path.0.pop() {
             if let Some(node) = node.upgrade() {
                 if !unwrap!(node.write()).update_rewards(&self.config, idx, eval) {
                     return;
@@ -168,6 +175,7 @@ impl<'a, 'b> Store<'a> for Tree<'a, 'b> {
 
     fn explore(&self, context: &Context) -> Option<(Candidate<'a>, Self::PayLoad)> {
         loop {
+            if self.stop.load(Ordering::Relaxed) { return None; }
             let cut: f64 = { *unwrap!(self.cut.read()) };
             let state = unwrap!(self.shared_tree.write()).descend(context, cut);
             if let DescendState::DeadEnd = state { return None; }
@@ -180,6 +188,10 @@ impl<'a, 'b> Store<'a> for Tree<'a, 'b> {
         }
     }
 
+    fn stop_exploration(&self) {
+        self.stop.store(true, Ordering::Relaxed);
+    }
+
     fn print_stats(&self) {
         warn!("=== Bandit statistics ===");
         warn!("Deadends encountered: {}", self.stats.num_deadends.load(Ordering::Relaxed));
@@ -190,10 +202,7 @@ impl<'a, 'b> Store<'a> for Tree<'a, 'b> {
 
 /// Path to follow to reach a leaf in the tree.
 #[derive(Clone, Default)]
-pub struct Path<'a> {
-    path: Vec<(Weak<RwLock<Children<'a>>>, usize)>,
-    actions: List<choice::ActionEx>,
-}
+pub struct Path<'a>(Vec<(Weak<RwLock<Children<'a>>>, usize)>);
 
 /// The search tree that will be traversed
 enum SubTree<'a> {

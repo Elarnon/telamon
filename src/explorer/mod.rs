@@ -12,6 +12,7 @@ pub mod local_selection;
 
 pub use self::config::{Config, SearchAlgorithm};
 pub use self::candidate::Candidate;
+pub use self::bandit_arm::TreeEvent;
 pub use self::logger::LogMessage;
 
 use self::choice::fix_order;
@@ -87,7 +88,7 @@ where
     let (monitor_sender, monitor_receiver) = channel::mpsc::channel(100);
     let maybe_candidate = crossbeam::scope( |scope| {
         unwrap!(scope.builder().name("Telamon - Logger".to_string())
-            .spawn( || logger::log(config, log_receiver)));
+            .spawn( || (unwrap!(logger::log(config, log_receiver)))));
         let best_cand_opt = scope.builder().name("Telamon - Monitor".to_string()).
             spawn(|| monitor(config, &candidate_store, monitor_receiver, log_sender));
         explore_space(config, &candidate_store, monitor_sender, context);

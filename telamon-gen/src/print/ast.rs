@@ -6,6 +6,7 @@ use serde::{Serialize, Serializer};
 use std::fmt::{self, Display, Formatter};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use utils::*;
+use indexmap::IndexMap;
 
 /// A named variable.
 #[derive(Clone, Debug)]
@@ -340,7 +341,7 @@ impl<'a> Set<'a> {
 #[derive(Debug, Clone, Serialize)]
 pub struct SetDef<'a> {
     name: &'a str,
-    keys: &'a HashMap<ir::SetDefKey, String>,
+    keys: &'a IndexMap<ir::SetDefKey, String>,
     arg: Option<Box<SetDef<'a>>>,
 }
 

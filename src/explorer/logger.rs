@@ -1,12 +1,14 @@
 use explorer::config::Config;
 use explorer::monitor;
-use serde::ser::{Serialize, SerializeSeq, Serializer};
-use serde_cbor;
+use serde::ser::Serialize;
+use bincode;
 use std::fs::File;
 use std::io;
 use std::io::{BufWriter, Write};
 use std::sync::mpsc;
 use std::time::Duration;
+use utils::tfrecord;
+use utils::tfrecord::RecordWriter;
 
 #[derive(Serialize, Deserialize)]
 pub enum LogMessage<E> {
@@ -24,7 +26,11 @@ pub enum LogError {
     #[fail(display = "{}", _0)]
     IOError(#[cause] ::std::io::Error),
     #[fail(display = "event serialization failed")]
-    SerializationError(#[cause] serde_cbor::error::Error),
+    SerializationError(#[cause] bincode::Error),
+    #[fail(display = "tfrecord serialization failed")]
+    TFRecordError(#[cause] tfrecord::WriteError),
+    #[fail(display = "{}", _0)]
+    RecvError(mpsc::RecvError),
 }
 
 impl From<::std::io::Error> for LogError {
@@ -33,9 +39,21 @@ impl From<::std::io::Error> for LogError {
     }
 }
 
-impl From<serde_cbor::error::Error> for LogError {
-    fn from(error: serde_cbor::error::Error) -> LogError {
+impl From<bincode::Error> for LogError {
+    fn from(error: bincode::Error) -> LogError {
         LogError::SerializationError(error)
+    }
+}
+
+impl From<tfrecord::WriteError> for LogError {
+    fn from(error: tfrecord::WriteError) -> LogError {
+        LogError::TFRecordError(error)
+    }
+}
+
+impl From<mpsc::RecvError> for LogError {
+    fn from(error: mpsc::RecvError) -> LogError {
+        LogError::RecvError(error)
     }
 }
 
@@ -43,36 +61,28 @@ pub fn log<E: Send + Serialize>(
     config: &Config,
     recv: mpsc::Receiver<LogMessage<E>>,
 ) -> Result<(), LogError> {
-    let mut ser = init_eventlog(config)?;
-    let mut seq = ser.serialize_seq(None)?;
+    let mut record_writer = File::create(&config.event_log)?;
     let mut write_buffer = init_log(config)?;
-    loop {
-        match recv.recv() {
-            Ok(message) => match message {
-                LogMessage::Event(event) => seq.serialize_element(&event)?,
-                LogMessage::NewBest {
-                    score,
-                    cpt,
-                    timestamp,
-                } => {
-                    log_monitor(score, cpt, timestamp, &mut write_buffer);
-                }
-                LogMessage::Finished(reason) => {
-                    unwrap!(writeln!(write_buffer, "search stopped because {}", reason));
-                }
-            },
-            Err(_) => {
-                seq.end()?;
-                write_buffer.flush()?;
-                return Ok(());
+    while let Ok(message) = recv.recv() {
+        match message {
+            LogMessage::Event(event) => {
+                record_writer.write_record(&bincode::serialize(&event)?)?;
+            }
+            LogMessage::NewBest {
+                score,
+                cpt,
+                timestamp,
+            } => {
+                log_monitor(score, cpt, timestamp, &mut write_buffer);
+            }
+            LogMessage::Finished(reason) => {
+                writeln!(write_buffer, "search stopped because {}", reason)?;
             }
         }
     }
-}
-
-fn init_eventlog(config: &Config) -> io::Result<serde_cbor::Serializer<File>> {
-    let f = File::create(&config.event_log)?;
-    Ok(serde_cbor::Serializer::packed(f))
+    record_writer.flush()?;
+    write_buffer.flush()?;
+    return Ok(());
 }
 
 fn init_log(config: &Config) -> io::Result<BufWriter<File>> {

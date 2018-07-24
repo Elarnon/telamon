@@ -7,6 +7,8 @@ extern crate num;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate failure;
 
 mod cache;
 mod dag;
@@ -17,6 +19,7 @@ mod vec_set;
 #[macro_use]
 pub mod unwrap;
 pub mod sequence;
+pub mod tfrecord;
 
 pub use self::cache::Cache;
 pub use self::dag::Dag;

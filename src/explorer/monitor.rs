@@ -89,7 +89,7 @@ where
         Ok(_) => warn!("No candidates to try anymore"),
         Err(reason) => {
             warn!("exploration stopped because {}", reason);
-            candidate_store.update_cut(0.0);
+            candidate_store.stop_exploration();
             unwrap!(log_sender.send(LogMessage::Finished(reason)));
         }
     }
@@ -200,6 +200,8 @@ where
           eval,
           status.best_candidate.as_ref().map_or(std::f64::INFINITY, |best:
                                                 &(Candidate, f64)| best.1 ));
+    candidate_store.commit_evaluation(cand.actions.clone(), payload, eval);
+
     let change = status
         .best_candidate
         .as_ref()
@@ -216,7 +218,6 @@ where
         unwrap!(log_sender.send(log_message));
         status.best_candidate = Some((cand, eval));
     }
-    candidate_store.commit_evaluation(payload, eval);
 
     // Note that it is possible that we actually didn't make an
     // evaluation here, because the evaluator may return an infinite

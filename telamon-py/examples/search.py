@@ -4,6 +4,7 @@ import telamon as tl
 import toml
 
 KERNELS = {
+    "mm-32-32-32": tl.MatMul(32, 32, 32),
     "matmul": tl.MatMul(1024, 1024, 1024),
     "matmul-m-32-4-n-32-4-k-32": tl.MatMul(
         1024, 1024, 1024, m_tiles=[32, 4], n_tiles=[32, 4], k_tiles=[32]
