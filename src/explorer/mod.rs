@@ -25,7 +25,6 @@ use crossbeam;
 use device::{Context, EvalMode};
 use model::bound;
 use search_space::SearchSpace;
-use serde::Serialize;
 use std::sync;
 use futures::prelude::*;
 use futures::{channel, SinkExt};
