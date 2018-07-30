@@ -140,6 +140,8 @@ impl<'a, 'b> Tree<'a, 'b> {
 impl<'a, 'b> Store<'a> for Tree<'a, 'b> {
     type PayLoad = Path<'a>;
 
+    type Event = TreeEvent;
+
     fn update_cut(&self, new_cut: f64) {
         *unwrap!(self.cut.write()) = new_cut;
         let root = unwrap!(self.shared_tree.write()).trim(new_cut);
@@ -155,12 +157,12 @@ impl<'a, 'b> Store<'a> for Tree<'a, 'b> {
 
     fn commit_evaluation(
         &self,
-        actions: List<choice::ActionEx>,
+        actions: &List<choice::ActionEx>,
         mut path: Self::PayLoad,
         eval: f64,
     ) {
         unwrap!(self.log.send(LogMessage::Event(TreeEvent::Evaluation {
-            actions: Sequence::List(actions),
+            actions: Sequence::List(actions.clone()),
             score: eval,
         })));
 

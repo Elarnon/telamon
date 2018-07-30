@@ -1,3 +1,25 @@
+//! This module provides Read and Write extensions for reading and
+//! writing TFRecord files. TFRecord is a simple container file format
+//! for embedding a sequence of data used notably by TensorFlow (see
+//! https://www.tensorflow.org/api_guides/python/python_io).
+//!
+//! A TFRecords file contains a sequence of strings with CRC32C
+//! checksums. Each record is constituded of a 12 bytes header
+//! containing the length of the data with checksum, followed by a
+//! `len` + 4 bytes payload containing the raw binary data and its
+//! checksum. All integers are encoded in little-endian format.
+//!
+//! u64       len
+//! u32       len_masked_crc32c
+//! [u8; len] data
+//! u32       data_masked_crc32c
+//!
+//! All records are concatenated together to create the final
+//! file. The checksums are 32-bit CRC using the Castagnoli polynomial
+//! masked as follow:
+//!
+//! masked_crc = ((crc >> 15) | (crc << 17)) + 0xa282ead8u32
+//!
 extern crate byteorder;
 extern crate crc;
 
@@ -52,22 +74,18 @@ fn masked_crc32(bytes: &[u8]) -> u32 {
     ((crc >> 15) | (crc << 17)).wrapping_add(0xa282ead8u32)
 }
 
+/// A trait extension for reading records.
+///
+/// Inspired from the C++ implementation at: *
+///  https://github.com/tensorflow/tensorflow/blob/f318765ad5a50b2fbd7cc08dd4ebc249b3924270/tensorflow/core/lib/io/record_reader.h
+///  *
+///  https://github.com/tensorflow/tensorflow/blob/f318765ad5a50b2fbd7cc08dd4ebc249b3924270/tensorflow/core/lib/io/record_reader.cc
 pub trait RecordReader: Read {
-    /// Read a single record. Returns `None` if no data is available.
-    fn try_read_record(&mut self) -> Result<Option<Vec<u8>>, ReadError> {
+    /// Read a single record.
+    fn read_record(&mut self) -> Result<Vec<u8>, ReadError> {
         let len = {
             let mut len_bytes = [0u8; 8];
-            let nread = self.read(&mut len_bytes)?;
-            if nread != len_bytes.len() {
-                if nread == 0 {
-                    return Ok(None);
-                } else {
-                    return Err(ReadError::IOError(::std::io::Error::new(
-                        ::std::io::ErrorKind::UnexpectedEof,
-                        "failed to fill whole buffer",
-                    )));
-                }
-            }
+            self.read_exact(&mut len_bytes)?;
             if self.read_u32::<LittleEndian>()? != masked_crc32(&len_bytes) {
                 return Err(ReadError::CorruptedRecord);
             }
@@ -84,22 +102,18 @@ pub trait RecordReader: Read {
         if self.read_u32::<LittleEndian>()? != masked_crc32(&record_bytes) {
             return Err(ReadError::CorruptedRecord);
         }
-        Ok(Some(record_bytes))
-    }
-
-    /// Read a single record.
-    fn read_record(&mut self) -> Result<Vec<u8>, ReadError> {
-        self.try_read_record().and_then(|record| {
-            record.ok_or(ReadError::IOError(::std::io::Error::new(
-                ::std::io::ErrorKind::UnexpectedEof,
-                "failed to read any data",
-            )))
-        })
+        Ok(record_bytes)
     }
 }
 
 impl<R: Read + ?Sized> RecordReader for R {}
 
+/// A trait extension for writing records.
+///
+/// Inspired from the C++ implementation at: *
+///  https://github.com/tensorflow/tensorflow/blob/f318765ad5a50b2fbd7cc08dd4ebc249b3924270/tensorflow/core/lib/io/record_writer.h
+///  *
+///  https://github.com/tensorflow/tensorflow/blob/f318765ad5a50b2fbd7cc08dd4ebc249b3924270/tensorflow/core/lib/io/record_writer.cc
 pub trait RecordWriter: Write {
     fn write_record(&mut self, bytes: &[u8]) -> Result<(), WriteError> {
         // We use a temporary buffer on the stack for the header

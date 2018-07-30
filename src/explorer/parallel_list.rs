@@ -12,13 +12,15 @@ use std::f64;
 impl<'a> Store<'a> for ParallelCandidateList<'a> {
     type PayLoad = ();
 
+    type Event = ();
+
     fn update_cut(&self, new_cut: f64) {
         self.lock().0.update_cut(new_cut);
     }
 
     fn commit_evaluation(
         &self,
-        _actions: List<choice::ActionEx>,
+        _actions: &List<choice::ActionEx>,
         (): Self::PayLoad,
         _: f64)
     { }

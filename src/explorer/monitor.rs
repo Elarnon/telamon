@@ -200,7 +200,7 @@ where
           eval,
           status.best_candidate.as_ref().map_or(std::f64::INFINITY, |best:
                                                 &(Candidate, f64)| best.1 ));
-    candidate_store.commit_evaluation(cand.actions.clone(), payload, eval);
+    candidate_store.commit_evaluation(&cand.actions, payload, eval);
 
     let change = status
         .best_candidate
