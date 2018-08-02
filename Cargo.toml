@@ -10,10 +10,6 @@ repository = "https://github.com/ulysseB/telamon/"
 build = "build.rs"
 
 [[bin]]
-name = "load"
-path = "src/bin/load.rs"
-
-[[bin]]
 name = "cuda-characterize"
 path = "src/bin/cuda_characterize.rs"
 required-features = ["cuda"]
