@@ -373,8 +373,7 @@ impl<'a, S: Scalar> Kernel<'a> for MatMul<'a, S> {
             let candidate = build_candidate(
                 builder.get(), ctx, vec![m_tiling, n_tiling, k_tiling]);
             unwrap!(candidate.apply_decision(ctx, explorer::choice::ActionEx::Action(
-                Action::DimKind(ir::DimId(11), DimKind::THREAD))));
-            candidate
+                Action::DimKind(ir::DimId(11), DimKind::THREAD))))
 
             // Arbitrary constrains to reduce the search space
             // TODO(search_space): remove arbitrary decisions.
