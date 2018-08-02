@@ -7,7 +7,7 @@ use num;
 use rand;
 use rayon::prelude::*;
 use telamon::{device, ir};
-use telamon::explorer::Candidate;
+use telamon::explorer::{self, Candidate};
 use telamon::helper::{self, Builder, MetaDimension, SignatureBuilder};
 use telamon::helper::tensor::*;
 use telamon::search_space::*;
@@ -372,8 +372,8 @@ impl<'a, S: Scalar> Kernel<'a> for MatMul<'a, S> {
             builder.order(&st_c.inst(), &acc_dim_k, Order::AFTER);
             let candidate = build_candidate(
                 builder.get(), ctx, vec![m_tiling, n_tiling, k_tiling]);
-            candidate.apply_decision(ctx, explorer::choice::ActionEx::Action(
-                Action::DimKind(ir::DimId(11), DimKind::THREAD)));
+            unwrap!(candidate.apply_decision(ctx, explorer::choice::ActionEx::Action(
+                Action::DimKind(ir::DimId(11), DimKind::THREAD))));
             candidate
 
             // Arbitrary constrains to reduce the search space
