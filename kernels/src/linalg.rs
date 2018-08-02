@@ -370,7 +370,10 @@ impl<'a, S: Scalar> Kernel<'a> for MatMul<'a, S> {
 
             // Order for correctness.
             builder.order(&st_c.inst(), &acc_dim_k, Order::AFTER);
-            build_candidate(builder.get(), ctx, vec![m_tiling, n_tiling, k_tiling])
+            let mut search_space = builder.get();
+            unwrap!(search_space.apply_decisions(
+                vec![Action::DimKind(ir::DimId(11), DimKind::THREAD)]));
+            build_candidate(search_space, ctx, vec![m_tiling, n_tiling, k_tiling])
 
             // Arbitrary constrains to reduce the search space
             // TODO(search_space): remove arbitrary decisions.
